@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+	--color-c2: #38BDF8;
+	--color-c2-highlight: #67E8F9;
+	--color-c2-averagelight: #60A5FA;
+	--color-c2-average: #2563EB;
+	--color-c2-extralight: #BAE6FD;
+	--color-c2-light :#7DD3FC;
+	--color-c2-dark: #2563EB;
+	--color-c2-extradark: #1E40AF;
+
+	--color-c1: #7C3AED;
+	--color-c1-averagelight: #E879F9;
+	--color-c1-average: #C026D3;
+	--color-c1-highlight: #9333EA;
+	--color-c1-buttonfont: #EDE9FE;
+	--color-c1-extralight: #A78BFA;
+	--color-c1-light: #8B5CF6
+	--color-c1-dark: #6D28D9;
+	--color-c1-extradark: #5B21B6;
+
+	--color-shades: #6B7280;
+	--color-shades-hover: #E5E7EB;
+	--color-shades-buttonfill: #F3F4F6;
+	--color-shades-extralight: #D1D5DB;
+	--color-shades-light: #9CA3AF;
+	--color-shades-dark: #111827;
+
+	--color-alert-font: #5B21B6;
+	--color-alert-fill: #DDD6FE;
+	--color-alert-border: #8B5CF6;
+	--color-alert-icon: #8B5CF6;
+	--color-alert-hover: #EDE9FE;
+
+	--color-success-font: #065F46;
+	--color-success-fill: #BBF7D0;
+	--color-success-border: #10B981;
+	--color-success-icon: #10B981;
+	--color-success-hover: #DCFCE7;
+
+	--color-info-font: #1E3A8A;
+	--color-info-fill: #BFDBFE;
+	--color-info-border: #3B82F6;
+	--color-info-icon: #3B82F6;
+	--color-info-hover: #DBEAFE;
+
+	--color-warning-font: #D97706;
+	--color-warning-fill: #FEF3C7;
+	--color-warning-border: #FBBF24;
+	--color-warning-icon: #D97706;
+	--color-warning-hover: #FFFBEB;
+
+	--color-error-font: #9F1239;
+	--color-error-fill: #FECDD3;
+	--color-error-border: #F43F5E;
+	--color-error-icon: #F43F5E;
+	--color-error-hover: #FFE4E6;
+
+	--font-min: 0.45rem;
+
+	--height-9/10: 90%;
+	--hight-view: 510px;
+	--height-block: 600px;
+	--height-era: 1000px;
+	--height-hero: 1200px;
+	--height-cx: 1600px;
+	--height-journey: 2000px;
+
+	--transition-duration-0: 0ms;
+	--transition-duration-100: 100ms;
+	--transition-duration-300: 300ms;
+	--transition-duration-500: 500ms;
+	--transition-duration-750: 750ms;
+	--transition-duration-800: 8000ms;
+	--transition-duration-1000: 1000ms;
+	--transition-duration-1500: 1500ms;
+	--transition-duration-2000: 2000ms;
+	--transition-duration-3000: 3000ms;
+	--transition-duration-5000: 5000ms;
+	--transition-duration-7000: 7000ms;
+	--transition-duration-11000: 11000ms;
+
+}
