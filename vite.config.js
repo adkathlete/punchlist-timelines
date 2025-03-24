@@ -8,6 +8,5 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  //base:"/punchlist-timelines",
   server: { port: 3000 }
 })

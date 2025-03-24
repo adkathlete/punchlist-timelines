@@ -122,7 +122,6 @@ function App() {
             <Route render={() => <Navigate replace to="/" />}/>
           </Routes>
         </div>
-        <Footer />
       </BrowserRouter>
       {/*Main App Routes*/}
       {/*Initialize the App Foundation Animation*/}
