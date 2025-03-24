@@ -112,7 +112,14 @@ function App() {
                 onAlert={handleAlert}
                 onError={handleError}
               />}/>
-            <Route render={() => <Navigate replace to="/builder" />}/>
+            <Route path="/punchlist-timelines" element={
+              <LightProjectTimeline
+                isMobile={isMobile}
+                APIGateway={APIGateway}
+                onAlert={handleAlert}
+                onError={handleError}
+              />}/>
+            <Route render={() => <Navigate replace to="/" />}/>
           </Routes>
         </div>
         <Footer />

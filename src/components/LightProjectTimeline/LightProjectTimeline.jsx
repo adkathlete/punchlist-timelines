@@ -1,5 +1,5 @@
 import React from 'react';
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useLayoutEffect} from 'react';
 
 //Import Data Loaders
 import XLSX from 'xlsx/xlsx.js';
@@ -106,12 +106,16 @@ const LightProjectTimeline=()=>{
   const [showProjectCost ,setShowProjectCost ]=useState(false);
   const [showCostInTitle,setShowCostInTitle]=useState(true);
   const [showCumulativeCost,setShowCumulativeCost]=useState(false);
+  const [showProjectCostActuals,setShowProjectCostActuals]=useState(false);
   const [showInitiativeDetails,setShowInitiativeDetails]=useState(false);
+  const [showInitiativeOverruns,setShowInitiativeOverruns]=useState(false);
   const [showInitiativeCostChart,setShowInitiativeCostChart]=useState(false);
 
   const [authenticate,setAuthenticate]=useState(true);
   const [accessGranted,setAccessGranted]=useState(false);
   const [punchlistClientID,setPunchlistClientID]=useState(null);
+
+  const [lightTimelineWidthPX,setLightTimelineWidthPX]=useState(0);
 
   useEffect(()=>{
     loadPunchlist();
@@ -121,6 +125,13 @@ const LightProjectTimeline=()=>{
     if(initiatives){
       initializeMonths(initiatives);
     }
+  },[initiatives]);
+
+  useLayoutEffect(()=>{
+    let timelineRef=document.getElementById('lightTimeline');
+    console.log(timelineRef.getBoundingClientRect());
+    setLightTimelineWidthPX(timelineRef.getBoundingClientRect().width);
+
   },[initiatives]);
 
   //Load the Punchlist from ./punchlists/punchlist.xlsx [Data]
@@ -135,9 +146,10 @@ const LightProjectTimeline=()=>{
       'endDate':{id:"endDate", columnKey:"F", columnIndex:5,},
       'duration':{id:"duration", columnKey:"G", columnIndex:6,},
       'offset':{id:"offset", columnKey:"H", columnIndex:7,},
-      'initiativeCost':{id:"initiativeCost", columnKey:"I", columnIndex:9,},
-      'color':{id:"color", columnKey:"J", columnIndex:10,},
-      'colorIndex':{id:"colorIndex", columnKey:"K", columnIndex:11,},
+      'overrun':{id:"overrun", columnKey:"I", columnIndex:6,},
+      'initiativeCost':{id:"initiativeCost", columnKey:"J", columnIndex:9,},
+      'color':{id:"color", columnKey:"K", columnIndex:10,},
+      'colorIndex':{id:"colorIndex", columnKey:"L", columnIndex:11,},
     }
 
     //Initialize new Zip Codes
@@ -193,6 +205,7 @@ const LightProjectTimeline=()=>{
         endDate:String(sheet[columns[HEADERS.endDate.columnKey].keys[i]].w),
         duration:Number.parseInt(sheet[columns[HEADERS.duration.columnKey].keys[i]].v),
         offset:Number.parseInt(sheet[columns[HEADERS.offset.columnKey].keys[i]].v),
+        overrun:Number.parseInt(sheet[columns[HEADERS.overrun.columnKey].keys[i]].v),
         timeTo:Number.parseInt((startDate.getTime()-today.getTime())/86400000),
         initiativeCost:Number.parseInt(sheet[columns[HEADERS.initiativeCost.columnKey].keys[i]].v),
         colorIndex:Number.parseInt(sheet[columns[HEADERS.colorIndex.columnKey].keys[i]].v),
@@ -205,6 +218,7 @@ const LightProjectTimeline=()=>{
     //Update the initiatieves 
     Object.values(newInitiatives).forEach(i=>{
       i.initiativeWidth=i.duration/365*100;
+      i.overrunWidth=i.overrun/365*100;
       i.offset=(i.offset+2)/365*100
     });
 
@@ -276,11 +290,11 @@ const LightProjectTimeline=()=>{
 
   return(
     <div className='relative flex flex-col h-full w-full items-center justify-end pb-24'>
-      <div className='relative flex flex-col items-center justify-start rounded-lg border-2 border-gray-900 z-50' style={{width:"70%", height:"87%"}}>
+      <div id={'lightTimeline'} className='relative flex flex-col items-center justify-start rounded-lg border-2 border-gray-900 z-50' style={{width:"70%", height:"85%"}}>
         {/*Core timeline*/}
         {initiatives&&Object.values(initiatives).map((entry,index)=>{
           return(
-            <div key={index} className={`relative flex flex-row w-full py-0.5 items-center justify-start ${entry.colorIndex===3?" border-black bg-gray-200":""} ${entry.active?"bg-sky-100":""} ${activeInitiativeID===entry.id?"shrink-0 h-6 bg-green-200":"flex-1"} z-50 transition-all duration-500 ease-in-out`}>
+            <div key={index} className={`relative flex flex-row w-full py-0.5 rounded-xl items-center justify-start ${entry.colorIndex===3?" border-black bg-gray-200":""} ${entry.active?"bg-sky-100":""} ${activeInitiativeID===entry.id?"shrink-0 h-6 bg-green-200":"flex-1"} z-50 transition-all duration-500 ease-in-out`}>
             {/*Initiative Name*/}
             <div className={`absolute top-0 left-0 h-full flex flex-row items-start justify-end ${entry.colorIndex===0||entry.colorIndex===3?"font-extrabold":""} ${entry.active?"text-sky-600 font-extrabold":""} ${entry.status==="Done"?"italic":""} transition-all duration-500 ease-in-out`} onMouseEnter={()=>showInitiativeDetails&&setActiveInitiativeID(entry.id)} style={{transform:"translate(calc(-100% - 1rem),0%)", width:"16rem",fontSize:activeInitiativeID===entry.id?"0.9rem":"0.5rem"}}>
             {String(entry.description)}
@@ -291,7 +305,15 @@ const LightProjectTimeline=()=>{
             </div>
             <div className='flex flex-col h-full' style={{width:`${entry.offset}%`}}>
             </div>
-            <div className={`flex flex-col h-full rounded-lg border-r-0 border-l-0 border-gray-900 z-50`} style={{width:`${entry.initiativeWidth}%`,minWidth:"10px",backgroundColor:TIMELINE_COLORS[entry.colorIndex].color}}>
+            <div className={`flex flex-row h-full items-center justify-end rounded-lg border-r-0 border-l-0 border-gray-900 z-50`} style={{width:`${entry.initiativeWidth}%`,minWidth:"10px",backgroundColor:TIMELINE_COLORS[entry.colorIndex].color}}>
+              {entry.overrun&&showInitiativeOverruns?(
+                <div className='flex flex-col shrink-0 h-1/2 bg-red-400 rounded-r-full' style={{transform:"translate(100%,0%)", width:`${entry.overrunWidth/100*lightTimelineWidthPX}px`, maxHeight:"5px"}}>
+                </div>
+              ):(
+                <div className='hidden'/>
+              )}
+              <div>
+              </div>
             </div>
             </div>
           )
@@ -302,16 +324,23 @@ const LightProjectTimeline=()=>{
           <div className='relative flex flex-row h-full w-full items-center justify-start rounded-lg' style={{zIndex:60}}>
           {/*Show Monthly Aggregate Costs*/}
           {showProjectCost?(
-            <div className='relative flex flex-row h-full w-full pt-12 items-center justify-start rounded-lg' style={{zIndex:60}}>
+            <div className='relative flex flex-row h-full w-full pt-24 items-center justify-start rounded-lg' style={{zIndex:60}}>
               {projectCost&&months&&Object.values(months).map((month,monthIndex)=>{
                 let maxMonthlyCost=Math.max(...Object.values(months).map(m=>m.totalCost));
                 return(
-                  <div key={monthIndex} className='flex flex-col h-full flex-1 items-center justify-end p-2' style={{zIndex:60}}>
+                  <div key={monthIndex} className='flex flex-col h-full flex-1 items-center justify-end' style={{zIndex:60}}>
                     {/*Monthly Bars*/}
                     {!showCumulativeCost?(
-                      <div className={`relative flex flex-col w-2/3 rounded-t-xl ${month.active?"bg-sky-400 border-t-4 border-gray-900":"border-t-4 border-sky-400 bg-gray-900"}`} style={{height:`${month.totalCost/maxMonthlyCost*100}%`}}>
-                        <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 text-sm' style={{transform:"translate(0%,calc(-100% - 1rem)"}}>
-                        {String("$"+Number.parseFloat(month.totalCost/1000).toFixed(1)+"K")}
+                      <div className='flex flex-row h-full w-full px-1 items-end justify-center'>
+                        <div className={`relative flex flex-col w-2/3 mx-1 rounded-t-xl ${month.active?"bg-sky-400 border-t-4 border-gray-900":"border-t-4 border-sky-400 bg-gray-900"}`} style={{height:`${month.totalCost/maxMonthlyCost*100}%`}}>
+                          <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 text-xs' style={{transform:"translate(0%,calc(-100% - 1rem)"}}>
+                          {!showProjectCostActuals&&String("$"+Number.parseFloat(month.totalCost/1000).toFixed(1)+"K")}
+                          </div>
+                        </div>
+                        <div className={`${showProjectCostActuals?"w-2/3 mx-1":"w-0 opacity-0"} relative flex flex-col rounded-t-xl border-t-4 border-gray-900 bg-gray-400 transition-all duration-500 ease-in-out`} style={{height:`${Math.random()*8+month.totalCost/maxMonthlyCost*100}%`}}>
+                          <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 text-xs' style={{transform:"translate(0%,calc(-100% - 1rem)"}}>
+                          {!showProjectCostActuals&&String("$"+Number.parseFloat(month.totalCost/1000).toFixed(1)+"K")}
+                          </div>
                         </div>
                       </div>
                     ):(
@@ -445,7 +474,7 @@ const LightProjectTimeline=()=>{
         {!showInitiativeCostChart?(
           <div className='absolute top-0 left-0 flex flex-row h-full w-full items-center justify-start z-50' onClick={()=>{if(activeInitiativeID){setActiveInitiativeID(null); setShowInitiativeDetails(false)}else{setActiveInitiativeID(Object.keys(initiatives)[0]); setShowInitiativeDetails(true);}}}>
             <div className='relative flex flex-col h-full items-end justify-start' style={{width:"22.5%",}}>
-              <div className='flex flex-col h-full w-full bg-black' style={{opacity:"20%"}}>
+              <div className='flex flex-col h-full w-full bg-black rounded-xl' style={{opacity:"20%"}}>
               </div>
               <div className='absolute top-0 right-0 flex flex-col h-3 w-3 border-2 border-green-400 bg-green-100 z-50' style={{transform:"translate(50%,calc(-50% - 1px)) rotate(45deg)"}}>
               </div>
@@ -460,8 +489,8 @@ const LightProjectTimeline=()=>{
           {String("11 Clinton Lane Project Timeline")}
 
           {showCostInTitle?(
-            <div className='flex flex-row items-center justify-end text-left rounded-xl text-black-500 text-4xl'>
-              <span className='text-green-800'>{String("+$"+Number.parseFloat(cumulativeCost/1000).toFixed(1)+"K")}</span> / <span className='text-black'>{String("$"+Number.parseFloat(projectCost/1000).toFixed(1)+"K")}</span>
+            <div className='flex flex-row items-center justify-end text-left rounded-xl text-black-500 text-4xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
+              <span className='text-green-800'>{String("+$"+Number.parseFloat(cumulativeCost/1000).toFixed(1)+"K")}</span> / <span className='text-black'>{String("$"+Number.parseFloat(projectCost/1000000).toFixed(2)+"M")}</span>
             </div>
           ):(
             <div className='hidden'/>
