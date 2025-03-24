@@ -6,14 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "npm run serve-heroku",
+    "start": "vite --host 0.0.0.0 --port $PORT preview",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
-    "postinstall": "npm run build",
-    "serve-heroku": "vite --host 0.0.0.0 --port $PORT preview",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.0.0-alpha.9",
