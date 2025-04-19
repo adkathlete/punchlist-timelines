@@ -13,14 +13,22 @@ import XLSX from 'xlsx/xlsx.js';
 const LightProjectTimeline=()=>{
 
   const ACCESS_CODE=1125;
+  const ADMIN_CODE=8757;
+  const MILLISECONDS_PER_DAY=86400000;
 
   const TIMELINE_COLORS = [
     {id:"0",description:"Punchlist Activities", color:"#8b5cf6", colorString:"indigo-600",},
-    {id:"1",description:"Site Visits", color:"#1e3a8a", colorString:"blue-900",},
-    {id:"2",description:"Client Reviews", color:"#38bdf8", colorString:"sky-400",},
+    {id:"1",description:"Professional Reviews", color:"#1e3a8a", colorString:"blue-900",},
+    {id:"2",description:"Client Due Dilligence", color:"#38bdf8", colorString:"sky-400",},
     {id:"3",description:"Municipal Reviews", color:"#6b7280", colorString:"gray-400",},
-    {id:"4",description:"Project Work", color:"#3b82f6", colorString:"blue-600" ,},
+    {id:"4",description:"Construction", color:"#3b82f6", colorString:"blue-600" ,},
     {id:"5",description:"Purchase Orders", color:"#5eead4", colorString:"cyan-400",},
+  ];
+
+  const COST_CHART_COLORS = [
+    {id:"0",description:"Accepted Bid", color:"#111827",},
+    {id:"1",description:"Market Bid", color:"#9ca3af",},
+    {id:"2",description:"Realized Cost", color:"#4ade80",},
   ];
 
   /* Manual Method -- But now loads from xlsx
@@ -108,7 +116,16 @@ const LightProjectTimeline=()=>{
   const [projectCost,setProjectCost]=useState(0);
   const [cumulativeCost,setCumulativeCost]=useState(0);
   const [maxInitiativeCost,setMaxInitiativeCost]=useState(null);
+
+  const [activeInitiative,setActiveInitiative]=useState(null)
   const [activeInitiativeID,setActiveInitiativeID]=useState(null);
+  const [editActiveInitiativeDescription,setEditActiveInitiativeDescription]=useState(false);
+  const [editActiveInitiativeStartDate,setEditActiveInitiativeStartDate]=useState(false);
+  const [editActiveInitiativeEndDate,setEditActiveInitiativeEndDate]=useState(false);
+  const [editActiveInitiativeAcceptedCost,setEditActiveInitiativeAcceptedCost]=useState(false);
+  const [editActiveInitiativeMarketCost,setEditActiveInitiativeMarketCost]=useState(false);
+  const [editActiveInitiativeRealizedCost,setEditActiveInitiativeRealizedCost]=useState(false);
+
   const [showProjectCost ,setShowProjectCost ]=useState(false);
   const [showCostInTitle,setShowCostInTitle]=useState(true);
   const [showCumulativeCost,setShowCumulativeCost]=useState(false);
@@ -116,9 +133,11 @@ const LightProjectTimeline=()=>{
   const [showInitiativeDetails,setShowInitiativeDetails]=useState(false);
   const [showInitiativeOverruns,setShowInitiativeOverruns]=useState(false);
   const [showInitiativeCostChart,setShowInitiativeCostChart]=useState(false);
+  const [showDeleteInitiatives,setShowDeleteInitiatives]=useState(false);
 
   const [authenticate,setAuthenticate]=useState(true);
   const [accessGranted,setAccessGranted]=useState(false);
+  const [adminAccess,setAdminAccess]=useState(false);
   const [punchlistClientID,setPunchlistClientID]=useState(null);
 
   const [lightTimelineWidthPX,setLightTimelineWidthPX]=useState(0);
@@ -145,18 +164,22 @@ const LightProjectTimeline=()=>{
     //Initialize headders for the csv file
     let HEADERS={
       'key':{id:"key", columnKey:"A", columnIndex:0,},
-      'summary':{id:"summary", columnKey:"B", columnIndex:1,},
-      'status':{id:"status", columnKey:"C", columnIndex:2,},
-      'active':{id:"active", columnKey:"D", columnIndex:3,},
-      'currentPhase':{id:"currentPhase", columnKey:"E", columnIndex:3,},
-      'startDate':{id:"startDate", columnKey:"F", columnIndex:4,},
-      'endDate':{id:"endDate", columnKey:"G", columnIndex:5,},
-      'duration':{id:"duration", columnKey:"H", columnIndex:6,},
-      'offset':{id:"offset", columnKey:"I", columnIndex:7,},
-      'overrun':{id:"overrun", columnKey:"J", columnIndex:6,},
-      'initiativeCost':{id:"initiativeCost", columnKey:"K", columnIndex:9,},
-      'color':{id:"color", columnKey:"L", columnIndex:10,},
-      'colorIndex':{id:"colorIndex", columnKey:"M", columnIndex:11,},
+      'description':{id:"description", columnKey:"B", columnIndex:1,},
+      'acceptedCost':{id:"acceptedCost", columnKey:"C", columnIndex:2,},
+      'marketCost':{id:"marketCost", columnKey:"D", columnIndex:3,},
+      'realizedCost':{id:"realizedCost", columnKey:"E", columnIndex:4,},
+      'realizedDifference':{id:"realizedDifference", columnKey:"F", columnIndex:5,},
+      'realizedPercentDifference':{id:"realizedPercentDifference", columnKey:"G", columnIndex:6,},
+      'status':{id:"status", columnKey:"H", columnIndex:7,},
+      'active':{id:"active", columnKey:"I", columnIndex:8,},
+      'currentPhase':{id:"currentPhase", columnKey:"J", columnIndex:9,},
+      'startDate':{id:"startDate", columnKey:"K", columnIndex:10,},
+      'endDate':{id:"endDate", columnKey:"L", columnIndex:11,},
+      'duration':{id:"duration", columnKey:"M", columnIndex:12,},
+      'offset':{id:"offset", columnKey:"N", columnIndex:13,},
+      'color':{id:"color", columnKey:"O", columnIndex:14,},
+      'colorIndex':{id:"colorIndex", columnKey:"P", columnIndex:15,},
+      'notes':{id:"notes", columnKey:"Q", columnIndex:16,},
     }
 
     //Initialize new Zip Codes
@@ -205,7 +228,12 @@ const LightProjectTimeline=()=>{
       //Parse the Row
       initiative={
         id:String(sheet[columns[HEADERS.key.columnKey].keys[i]].v),
-        description:String(sheet[columns[HEADERS.summary.columnKey].keys[i]].v),
+        description:String(sheet[columns[HEADERS.description.columnKey].keys[i]].v),
+        acceptedCost:Number.parseFloat(sheet[columns[HEADERS.acceptedCost.columnKey].keys[i]].v),
+        marketCost:Number.parseFloat(sheet[columns[HEADERS.marketCost.columnKey].keys[i]].v),
+        realizedCost:Number.parseFloat(sheet[columns[HEADERS.realizedCost.columnKey].keys[i]].v),
+        realizedDifference:Number.parseFloat(sheet[columns[HEADERS.realizedDifference.columnKey].keys[i]].v),
+        realizedPercentDifference:Number.parseFloat(sheet[columns[HEADERS.realizedPercentDifference.columnKey].keys[i]].v),
         status:String(sheet[columns[HEADERS.status.columnKey].keys[i]].v),
         active:Boolean(sheet[columns[HEADERS.active.columnKey].keys[i]].v),
         currentPhase:Boolean(sheet[columns[HEADERS.currentPhase.columnKey].keys[i]].v),
@@ -213,10 +241,9 @@ const LightProjectTimeline=()=>{
         endDate:String(sheet[columns[HEADERS.endDate.columnKey].keys[i]].w),
         duration:Number.parseInt(sheet[columns[HEADERS.duration.columnKey].keys[i]].v),
         offset:Number.parseInt(sheet[columns[HEADERS.offset.columnKey].keys[i]].v),
-        overrun:Number.parseInt(sheet[columns[HEADERS.overrun.columnKey].keys[i]].v),
         timeTo:Number.parseInt((startDate.getTime()-today.getTime())/86400000),
-        initiativeCost:Number.parseInt(sheet[columns[HEADERS.initiativeCost.columnKey].keys[i]].v),
         colorIndex:Number.parseInt(sheet[columns[HEADERS.colorIndex.columnKey].keys[i]].v),
+        //notes:Number.parseInt(sheet[columns[HEADERS.notes.columnKey].keys[i]].v),
       }
 
       //Add the row
@@ -226,7 +253,6 @@ const LightProjectTimeline=()=>{
     //Update the initiatieves 
     Object.values(newInitiatives).forEach(i=>{
       i.initiativeWidth=i.duration/365*100;
-      i.overrunWidth=i.overrun/365*100;
       i.offset=(i.offset+2)/365*100
     });
 
@@ -241,18 +267,18 @@ const LightProjectTimeline=()=>{
   const initializeMonths=(currentInitiatives)=>{
     let today = new Date();
     let newMonths={
-      0:{month:0, totalCost:0, cumCost:0, active:today.getUTCMonth()===0},
-      1:{month:1, totalCost:0, cumCost:0, active:today.getUTCMonth()===1},
-      2:{month:2, totalCost:0, cumCost:0, active:today.getUTCMonth()===2},
-      3:{month:3, totalCost:0, cumCost:0, active:today.getUTCMonth()===3},
-      4:{month:4, totalCost:0, cumCost:0, active:today.getUTCMonth()===4},
-      5:{month:5, totalCost:0, cumCost:0, active:today.getUTCMonth()===5},
-      6:{month:6, totalCost:0, cumCost:0, active:today.getUTCMonth()===6},
-      7:{month:7, totalCost:0, cumCost:0, active:today.getUTCMonth()===7},
-      8:{month:8, totalCost:0, cumCost:0, active:today.getUTCMonth()===8},
-      9:{month:9, totalCost:0, cumCost:0, active:today.getUTCMonth()===9},
-      10:{month:10, totalCost:0, cumCost:0, active:today.getUTCMonth()===10},
-      11:{month:11, totalCost:0, cumCost:0, active:today.getUTCMonth()===11},
+      0:{month:0, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===0},
+      1:{month:1, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===1},
+      2:{month:2, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===2},
+      3:{month:3, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===3},
+      4:{month:4, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===4},
+      5:{month:5, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===5},
+      6:{month:6, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===6},
+      7:{month:7, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===7},
+      8:{month:8, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===8},
+      9:{month:9, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===9},
+      10:{month:10, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===10},
+      11:{month:11, realizedCost:0, marketCost:0, acceptedCost:0, cumRealizedCost:0, cumMarketCost:0, cumAcceptedCost:0, active:today.getUTCMonth()===11},
     };
     let month;
     let newProjectCost=0;
@@ -261,27 +287,39 @@ const LightProjectTimeline=()=>{
 
     Object.values(currentInitiatives).forEach(i=>{
       i.month=new Date(i.startDate).getUTCMonth();
-      newMonths[i.month].totalCost+=i.initiativeCost;
-      newProjectCost+=i.initiativeCost;
+      newMonths[i.month].realizedCost+=i.realizedCost;
+      newMonths[i.month].marketCost+=i.marketCost;
+      newMonths[i.month].acceptedCost+=i.acceptedCost;
+
+      newProjectCost+=i.acceptedCost;
 
       if(i.status==="Done"){
-        currentProjectCost+=i.initiativeCost;
+        currentProjectCost+=i.realizedCost;
       }
 
-      if(i.initiativeCost>maxICost){
-        maxICost=i.initiativeCost;
+      if(i.acceptedCost>maxICost){
+        maxICost=i.acceptedCost;
       }
     });
 
-    let cumCost=0;
+    let cumRealizedCost=0;
+    let cumMarketCost=0;
+    let cumAcceptedCost=0;
+
     Object.values(newMonths).forEach(m=>{
-      cumCost+=m.totalCost;
-      m.cumCost=cumCost;
-    })
+      cumRealizedCost+=m.realizedCost;
+      cumMarketCost+=m.marketCost;
+      cumAcceptedCost+=m.acceptedCost
+
+      m.cumRealizedCost=cumRealizedCost;
+      m.cumMarketCost=cumMarketCost;
+      m.cumRealizedCost=cumRealizedCost;
+    });
 
     console.log(newMonths);
     console.log(newProjectCost);
     console.log(currentProjectCost);
+    console.log(maxICost);
     setMonths(newMonths);
     setProjectCost(newProjectCost);
     setCumulativeCost(currentProjectCost);
@@ -295,10 +333,93 @@ const LightProjectTimeline=()=>{
     if(Number.parseInt(targetValue)===ACCESS_CODE){
       setAccessGranted(true);
     }
+
+    if(Number.parseInt(targetValue)===ADMIN_CODE){
+      setAccessGranted(true);
+      setAdminAccess(true);
+    }
+  }
+
+  //Scroll Window
+  const scrollToTimeline=()=>{
+    console.log("Scrolling");
+    let ref=document.getElementById("punchlistScroll");
+    console.log(ref);
+    ref.scrollTo(0,ref.getBoundingClientRect().height);
+  }
+
+  //Update Initiative
+  const updateInitiative=(currentInitiatives,initiativeID,type,updateValue)=>{
+    let newInitiatives={...currentInitiatives};
+
+    console.log("Refreshing Initiatives")
+    console.log(newInitiatives[initiativeID]);
+    console.log(updateValue);
+
+    if(type==='DESCRIPTION'){
+      newInitiatives[initiativeID].description=updateValue;
+    }
+
+    if(type==='START_DATE'){
+      if(new Date(updateValue)){
+        newInitiatives[initiativeID].startDate=updateValue;
+        newInitiatives[initiativeID].duration=(new Date(newInitiatives[initiativeID].endDate) - new Date(newInitiatives[initiativeID].startDate))/MILLISECONDS_PER_DAY;
+        newInitiatives[initiativeID].initiativeWidth=newInitiatives[initiativeID].duration/365*100;
+        
+        let offsetDays=(new Date(newInitiatives[initiativeID].startDate) - new Date("01/01/2025"))/MILLISECONDS_PER_DAY;
+        newInitiatives[initiativeID].offset=(offsetDays+2)/365*100
+      }
+
+    }
+
+    if(type==='END_DATE'){
+      newInitiatives[initiativeID].endDate=updateValue;
+
+      newInitiatives[initiativeID].duration=(new Date(newInitiatives[initiativeID].endDate) - new Date(newInitiatives[initiativeID].startDate))/MILLISECONDS_PER_DAY;
+      newInitiatives[initiativeID].initiativeWidth=newInitiatives[initiativeID].duration/365*100;      
+    }
+
+    if(type==='ACCEPTED_COST'){
+      if(!Number.isNaN(Number.parseFloat(updateValue))){
+        newInitiatives[initiativeID].acceptedCost=Number.parseFloat(updateValue);
+      }else{
+        newInitiatives[initiativeID].acceptedCost=0;
+      }
+    }
+
+    if(type==='MARKET_COST'){
+      if(!Number.isNaN(Number.parseFloat(updateValue))){
+        newInitiatives[initiativeID].marketCost=Number.parseFloat(updateValue);
+      }else{
+        newInitiatives[initiativeID].marketCost=0;
+      }
+    }
+
+    if(type==='REALIZED_COST'){
+      if(!Number.isNaN(Number.parseFloat(updateValue))){
+        newInitiatives[initiativeID].realizedCost=Number.parseFloat(updateValue);
+      }else{
+        newInitiatives[initiativeID].realizedCost=0;
+      }
+    }
+
+
+    console.log(newInitiatives[initiativeID]);
+    setInitiatives(newInitiatives);
+    setActiveInitiative(newInitiatives[initiativeID]);
+  }
+
+  //Delete Initiative
+  const deleteInitiative=(currentInitiatives,initiativeID)=>{
+    let newInitiatives={...currentInitiatives};
+
+    delete newInitiatives[initiativeID];
+
+    setInitiatives(newInitiatives)
   }
 
   return(
-    <div className='relative flex flex-col h-screen w-full items-center justify-start overflow-y-scroll'>
+    <div id={"punchlistScroll"} className='relative flex flex-col h-screen w-full items-center justify-start overflow-y-scroll'>
       {/*Landing Page*/}
       {accessGranted?(
         <div className='relative flex flex-row shrink-0 h-screen w-full items-center justify-start'>
@@ -317,19 +438,57 @@ const LightProjectTimeline=()=>{
             <div className='flex flex-col mt-4 mb-12 h-1 w-full rounded-full bg-black'>
             </div>
             <div className='flex flex-row w-full my-1 items-center justify-start text-left rounded-xl text-black text-3xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
-              <span className='text-black flex-1 font-bold '>{String("Project Start: ")}</span><span className='text-xl font-bold'>{String("3/25/2025")}</span>
+              <span className='text-black flex-1 font-bold '>{String("Project Start: ")}</span><span className='text-xl font-bold'>{String("01/01/2025")}</span>
             </div>
             <div className='flex flex-row w-full my-1 items-center justify-start text-left rounded-xl text-black text-3xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
-              <span className='text-black flex-1 font-bold '>{String("Current Date: ")}</span><span className='text-xl font-bold'>{String((today.getUTCMonth()+1)+"/"+today.getUTCDate()+"/"+today.getUTCFullYear())}</span>
+              <span className='text-black flex-1 font-bold '>{String("Current Date: ")}</span><span className='text-xl font-bold'>{String("0"+(today.getUTCMonth()+1)+"/"+today.getUTCDate()+"/"+today.getUTCFullYear())}</span>
             </div>
             <div className='flex flex-row w-full my-1 items-center justify-start text-left rounded-xl text-black text-3xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
-              <span className='text-black flex-1 font-bold '>{String("Completion Date: ")}</span><span className='text-xl font-bold'>{String("10/25/2025")}</span>
+              <span className='text-black flex-1 font-bold '>{String("Completion Date: ")}</span><span className='text-xl font-bold'>{String("10/17/2025")}</span>
             </div>
             <div className='flex flex-row w-full mt-8 my-1 items-center justify-start text-left rounded-xl text-black text-3xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
-              <span className='text-black flex-1 font-bold '>{String("Investment: ")}</span><span className='font-bold text-4xl text-green-800'>{String("+$"+Number.parseFloat(cumulativeCost/1000).toFixed(1)+"K")}</span>
+              <span className='text-black flex-1 font-bold '>{String("Investment: ")}</span>
+              <span className='font-bold text-4xl text-green-800'>
+                <div className='flex flex-col h-full items-center justify-center text-4xl font-bold text-green-800 px-2'>
+                    <LightNumber
+                      value={(cumulativeCost)}
+                      config={{
+                        size:"xl",
+                        prefix:"$$",
+                        suffix:"",
+                        standardColor:"#ffffff",
+                        decimals:1,
+                        bold:true,
+                        centerText:true,
+                        signed:false,
+                        isTimestamp:false,
+                        includeDateNum:false,
+                      }}
+                    />
+                  </div>
+              </span>
             </div>
             <div className='flex flex-row w-full my-1 items-center justify-start text-left rounded-xl text-black text-3xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
-              <span className='text-black flex-1 font-bold '>{String("Left to Pay: ")}</span><span className='font-bold text-4xl'>{String("$"+Number.parseFloat((projectCost-cumulativeCost)/1000).toFixed(1)+"K")}</span>
+              <span className='text-black flex-1 font-bold '>{String("Left to Pay: ")}</span>
+                <span className='font-bold text-4xl'>
+                  <div className='flex flex-col h-full items-center justify-center text-4xl font-bold text-black px-2'>
+                    <LightNumber
+                      value={(projectCost-cumulativeCost)}
+                      config={{
+                        size:"xl",
+                        prefix:"$",
+                        suffix:"",
+                        standardColor:"#ffffff",
+                        decimals:1,
+                        bold:true,
+                        centerText:true,
+                        signed:false,
+                        isTimestamp:false,
+                        includeDateNum:false,
+                      }}
+                    />
+                  </div>
+                </span>
             </div>
 
             <div className='flex flex-col flex-1'>
@@ -342,7 +501,7 @@ const LightProjectTimeline=()=>{
 
           {/*Scroll Down*/}
           <div className='absolute bottom-0 left-0 flex flex-col h-48 w-full items-center justify-center'>
-            <div className='relative flex flex-col h-24 w-64 items-center justify-center'>
+            <div className='relative flex flex-col h-24 w-64 items-center justify-center' onClick={()=>scrollToTimeline()}>
               <div className='absolute top-0 left-0 flex flex-col h-full w-full items-center justify-center z-50' style={{transform:"scale(0.1) scaleX(2)"}}>
                 <LightIcon iconID={"CHEVRON_DOWN"} rotate={0}/>
               </div>
@@ -351,14 +510,6 @@ const LightProjectTimeline=()=>{
               </div>
             </div>
           </div>
-        </div>
-      ):(
-        <div className='hidden'/>
-      )}
-
-      {/*Space*/}
-      {accessGranted?(
-        <div className='flex flex-col w-full h-24 shrink-0 items-center justify-center'>
         </div>
       ):(
         <div className='hidden'/>
@@ -378,7 +529,7 @@ const LightProjectTimeline=()=>{
                   </div>
                   {/*Initiative Name*/}
                   <div className={`absolute top-0 right-0 h-full flex flex-col items-end justify-center text-right ${entry.colorIndex===0||entry.colorIndex===3?"font-extrabold":""} ${entry.currentPhase?"text-sky-600 font-extrabold":""} ${entry.status==="Done"?"italic":""} transition-all duration-500 ease-in-out`} onMouseEnter={()=>showInitiativeDetails&&setActiveInitiativeID(entry.id)} style={{transform:"translate(calc(100% + 1rem),0%)",fontSize:"0.5rem"}}>
-                  {showInitiativeCostChart?String("$"+Number.parseFloat(entry.initiativeCost/1000).toFixed(1)+"K"):String(entry.startDate+" - "+entry.endDate)}
+                  {showInitiativeCostChart?String("$"+Number.parseFloat(entry.acceptedCost/1000).toFixed(1)+"K"):String("Date: "+entry.startDate+" - "+entry.endDate)}
                   </div>
                   <div className='flex flex-col h-full' style={{width:`${entry.offset}%`}}>
                   </div>
@@ -397,26 +548,31 @@ const LightProjectTimeline=()=>{
             })}
 
             {/*Cost Chart*/}
-            <div className={`absolute bottom-0 left-0 flex flex-row ${showProjectCost||showInitiativeCostChart?"h-full":"h-0 opacity-0"} w-full items-center rounded-lg justify-center transition-all duration-1000 ease-in-out`} onClick={()=>{if(!showInitiativeCostChart){setShowInitiativeCostChart(true); setShowProjectCost(false)}else{setShowInitiativeCostChart(false); setShowProjectCost(true)}}} style={{zIndex:60}}>
+            <div className={`absolute bottom-0 left-0 flex flex-row ${showProjectCost||showInitiativeCostChart?"h-full":"h-0 opacity-0"} w-full items-center rounded-lg justify-center transition-all duration-1000 ease-in-out`} onClick={()=>{if(!showInitiativeCostChart){setShowInitiativeCostChart(false); setShowProjectCost(true)}else{setShowInitiativeCostChart(false); setShowProjectCost(true)}}} style={{zIndex:60}}>
               <div className='relative flex flex-row h-full w-full items-center justify-start rounded-lg' style={{zIndex:60}}>
               {/*Show Monthly Aggregate Costs*/}
               {showProjectCost?(
                 <div className='relative flex flex-row h-full w-full pt-24 items-center justify-start rounded-lg' style={{zIndex:60}}>
                   {projectCost&&months&&Object.values(months).map((month,monthIndex)=>{
-                    let maxMonthlyCost=Math.max(...Object.values(months).map(m=>m.totalCost));
+                    let maxMonthlyCost=Math.max(...Object.values(months).map(m=>m.acceptedCost));
                     return(
                       <div key={monthIndex} className='flex flex-col h-full flex-1 items-center justify-end' style={{zIndex:60}}>
                         {/*Monthly Bars*/}
                         {!showCumulativeCost?(
                           <div className='flex flex-row h-full w-full px-1 items-end justify-center'>
-                            <div className={`relative flex flex-col w-2/3 mx-1 rounded-t-xl ${month.active?"bg-sky-400 border-t-4 border-gray-900":"border-t-4 border-sky-400 bg-gray-900"}`} style={{height:`${month.totalCost/maxMonthlyCost*100}%`}}>
-                              <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 text-xs' style={{transform:"translate(0%,calc(-100% - 1rem)"}}>
-                              {!showProjectCostActuals&&String("$"+Number.parseFloat(month.totalCost/1000).toFixed(1)+"K")}
+                            <div className={`relative flex flex-col w-2/3 mx-1 rounded-t-xl border-t-4 border-sky-400 bg-gray-900`} style={{height:`${month.acceptedCost/maxMonthlyCost*100}%`}}>
+                              <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 transition-all duration-500 ease-in-out' style={{transform:"translate(0%,calc(-100% - 1rem)", fontSize:showProjectCostActuals?"0.4rem":"0.7rem"}}>
+                              {String("$"+Number.parseFloat(month.acceptedCost/1000).toFixed(1)+"K")}
                               </div>
                             </div>
-                            <div className={`${showProjectCostActuals?"w-2/3 mx-1":"w-0 opacity-0"} relative flex flex-col rounded-t-xl border-t-4 border-gray-900 bg-gray-400 transition-all duration-500 ease-in-out`} style={{height:`${Math.random()*8+month.totalCost/maxMonthlyCost*100}%`}}>
-                              <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900 text-xs' style={{transform:"translate(0%,calc(-100% - 1rem)"}}>
-                              {!showProjectCostActuals&&String("$"+Number.parseFloat(month.totalCost/1000).toFixed(1)+"K")}
+                            <div className={`${showProjectCostActuals?"w-2/3 mx-1":"w-0 opacity-0"} relative flex flex-col rounded-t-xl border-t-4 border-gray-900 bg-gray-400 transition-all duration-500 ease-in-out`} style={{height:`${month.marketCost/maxMonthlyCost*100}%`}}>
+                              <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900' style={{transform:"translate(0%,calc(-100% - 1rem)", fontSize:"0.4rem"}}>
+                              {showProjectCostActuals&&String("$"+Number.parseFloat(month.acceptedCost/1000).toFixed(1)+"K")}
+                              </div>
+                            </div>
+                            <div className={`${showProjectCostActuals?"w-2/3 mx-1":"w-0 opacity-0"} relative flex flex-col rounded-t-xl border-t-4 border-gray-900 bg-green-400 transition-all duration-500 ease-in-out`} style={{height:`${month.marketCost/maxMonthlyCost*100}%`}}>
+                              <div className='absolute top-0 left-0 w-full flex flex-col items-center justify-center font-bold text-gray-900' style={{transform:"translate(0%,calc(-100% - 1rem)", fontSize:"0.4rem"}}>
+                              {showProjectCostActuals&&String("$"+Number.parseFloat(month.realizedCost/1000).toFixed(1)+"K")}
                               </div>
                             </div>
                           </div>
@@ -444,13 +600,13 @@ const LightProjectTimeline=()=>{
               )}
 
               {/*Show Costs Per Initiatives as a row bar chart*/}
-              {showInitiativeCostChart&&maxInitiativeCost?(
+              {false && showInitiativeCostChart&&maxInitiativeCost?(
                 <div className='relative flex flex-col h-full w-full items-center justify-start' style={{zIndex:60}}>
                   {initiatives&&Object.values(initiatives).map((i,initiativeIndex)=>{
 
                     return(
-                      <div key={initiativeIndex} className={`flex flex-row flex-1 py-0.5 w-full items-center justify-start`} style={{zIndex:60}}>
-                        <div className={`flex flex-row h-full items-center justify-end rounded-r-full border-r-4 ${i.currentPhase?"bg-sky-400 border-gray-900":"bg-gray-900 border-sky-400"} transition-all duration-500 ease-in-out`} style={{width:`${i.initiativeCost/maxInitiativeCost*100}%`}}>
+                      <div key={initiativeIndex} className={`flex flex-row flex-1 py-1 w-full items-center justify-start`} style={{zIndex:60}}>
+                        <div className={`flex flex-row h-full items-center justify-end rounded-r-full border-r-4 ${i.currentPhase?"bg-sky-400 border-gray-900":"bg-gray-900 border-sky-400"} transition-all duration-500 ease-in-out`} style={{width:`${30}%`}}>
                         </div>
                       </div>
                     )
@@ -478,7 +634,7 @@ const LightProjectTimeline=()=>{
                       <div className='flex flex-col my-1 w-3/4 bg-gray-900 rounded-full' style={{height:"0.2rem"}}>
                       </div>
                        <div className=' flex flex-col w-full flex-1 items-center justify-center text-4xl font-bold text-gray-800'>
-                        {String("+$"+Number.parseFloat(initiatives[activeInitiativeID].initiativeCost/1000).toFixed(1)+"K")}
+                        {String("+$"+Number.parseFloat(initiatives[activeInitiativeID].acceptedCost/1000).toFixed(1)+"K")}
                       </div>
                       <div className='flex flex-row items-center justify-start text-sm font-bold text-gray-900 italic' style={{color:TIMELINE_COLORS[initiatives[activeInitiativeID].colorIndex].color}}>
                         {String(TIMELINE_COLORS[initiatives[activeInitiativeID].colorIndex].description)}
@@ -554,12 +710,12 @@ const LightProjectTimeline=()=>{
             {!showInitiativeCostChart?(
               <div className='absolute top-0 left-0 flex flex-row h-full w-full items-center justify-start z-50'>
                 <div className='relative flex flex-row h-full w-full items-center justify-start'>
-                  <div className='flex flex-col h-full items-end justify-start' style={{width:`${23}%`,}}>
+                  <div className='flex flex-col h-full items-end justify-start' style={{width:`${27.5}%`,}}>
                     <div className='flex flex-col h-full w-full bg-black rounded-l-sm' style={{opacity:"20%"}}>
                     </div>
                   </div>
                   {[0].map((entry,index)=>{
-                    let width=23;
+                    let width=27.5;
 
                     if(activeInitiativeID){
                       width=initiatives[activeInitiativeID].offset;
@@ -567,7 +723,7 @@ const LightProjectTimeline=()=>{
 
                     return(
                       <div key={index} className='absolute top-0 left-0 flex flex-row h-full w-full items-center justify-start'>
-                        <div className='relative flex flex-row h-full transition-all duration-500 ease-in-out' style={{width:`${width}%`}}>
+                        <div className='relative flex flex-row h-full transition-all duration-3000 ease-in-out' style={{width:`${width}%`}}>
                           <div className='absolute top-0 right-0 flex flex-col h-full border-r-2 border-dashed border-gray-900 z-50' style={{transform:"translate(50%,0%)"}}>
                           </div>
                           <div className='absolute top-0 right-0 flex flex-col h-3 w-3 border-2 border-green-400 bg-green-100 z-50' style={{transform:"translate(50%,calc(-50% - 1px)) rotate(45deg)"}}>
@@ -583,12 +739,46 @@ const LightProjectTimeline=()=>{
             )}
             {/*Title*/}
             <div className='absolute top-0 left-0 flex flex-row w-full items-center justify-start text-4xl font-bold' style={{transform:"translate(0%,calc(-100% - 3rem))"}}>
-              <div className='flex flex-row items-center justify-between border-black text-left' style={{width:"100%"}}>
+              <div className='flex flex-row items-center justify-between border-white text-left' style={{width:"100%"}}>
               {String("11 Clinton Lane Project Timeline")}
 
               {showCostInTitle?(
-                <div className='flex flex-row items-center justify-end text-left rounded-xl text-black-500 text-4xl'>
-                  <span className='text-green-800'>{String("+$"+Number.parseFloat(cumulativeCost/1000).toFixed(1)+"K")}</span> / <span className='text-black'>{String("$"+Number.parseFloat(projectCost/1000).toFixed(1)+"K")}</span>
+                <div className='flex flex-row items-center justify-end text-left rounded-xl text-black text-4xl' onClick={()=>setShowProjectCostActuals((showProjectCostActuals)=>!showProjectCostActuals)}>
+                  <span className='text-green-800'>
+                  <LightNumber
+                      value={(cumulativeCost)}
+                      config={{
+                        size:"xl",
+                        prefix:"$$",
+                        suffix:"",
+                        standardColor:"#ffffff",
+                        decimals:1,
+                        bold:true,
+                        centerText:true,
+                        signed:false,
+                        isTimestamp:false,
+                        includeDateNum:false,
+                      }}
+                    />
+                  </span> 
+                  / 
+                  <span className='text-black'>
+                  <LightNumber
+                      value={(projectCost)}
+                      config={{
+                        size:"xl",
+                        prefix:"$",
+                        suffix:"",
+                        standardColor:"#ffffff",
+                        decimals:1,
+                        bold:true,
+                        centerText:true,
+                        signed:false,
+                        isTimestamp:false,
+                        includeDateNum:false,
+                      }}
+                    />
+                  </span>
                 </div>
               ):(
                 <div className='hidden'/>
@@ -596,18 +786,29 @@ const LightProjectTimeline=()=>{
               </div>
             </div>
             {/*Logo*/}
-            <div className='absolute top-0 left-0 items-center justify-center' onClick={()=>{if(showInitiativeCostChart){setShowInitiativeCostChart(false); setShowProjectCost(false); setActiveInitiativeID(null); setShowInitiativeDetails(false);}else{setShowProjectCost((showProjectCost)=>!showProjectCost); setActiveInitiativeID(null); setShowInitiativeDetails(false);}}} style={{zIndex:60,transform:"translate(calc(-100% - 1.2rem),calc(-100% - 2.6rem))"}}>
-              <img className="inline-block h-14 w-14 flex-shrink-0 rounded-sm" src={"./photos/punchlistLogo.png"} alt="Location Icon"/>
+            <div className='absolute top-0 left-0 items-center justify-center' onClick={()=>{if(showInitiativeCostChart){setShowInitiativeCostChart(false); setShowProjectCost(false); setActiveInitiativeID(null); setShowInitiativeDetails(false);}else{setShowProjectCost((showProjectCost)=>!showProjectCost); setActiveInitiativeID(null); setShowInitiativeDetails(false);}}} style={{zIndex:60,transform:"translate(calc(-100% - 1.2rem),calc(-100% - 2.0rem))"}}>
+              <img className="inline-block h-20 w-20 flex-shrink-0 rounded-sm" src={"./photos/punchlistLogo.png"} alt="Location Icon"/>
             </div>
             {/*Legend*/}
             <div className='absolute bottom-0 left-0 flex flex-row w-full items-center justify-center' style={{transform:"translate(0%,calc(100% + 1rem))"}}>
               <div className='flex flex-wrap h-16 w-full px-4 items-center justify-center rounded-full'>
-                {TIMELINE_COLORS.map((color,colorIndex)=>{
+                {!showProjectCostActuals&&TIMELINE_COLORS.map((color,colorIndex)=>{
                   return(
                     <div key={colorIndex} className='flex flex-row items-center mx-2 justify-center text-sm font-bold text-white'>
                       <div className='flex flex-col h-3 w-3 mx-2 rounded-full' style={{backgroundColor:color.color}}>
                       </div>
-                      <div className='flex flex-col text-xs font-bold text-gray-900'>
+                      <div className='flex flex-col text-xs font-bold text-gray-800'>
+                        {String(color.description)}
+                      </div>
+                    </div>
+                  )
+                })}
+                {showProjectCostActuals&&COST_CHART_COLORS.map((color,colorIndex)=>{
+                  return(
+                    <div key={colorIndex} className='flex flex-row items-center mx-2 justify-center text-sm font-bold text-white'>
+                      <div className='flex flex-col h-3 w-3 mx-2 rounded-full' style={{backgroundColor:color.color}}>
+                      </div>
+                      <div className='flex flex-col text-xs font-bold text-gray-800'>
                         {String(color.description)}
                       </div>
                     </div>
@@ -633,23 +834,283 @@ const LightProjectTimeline=()=>{
               www.PunchlistRE.com
             </NavLink>
           </div>
+        </div>
+      ):(
+        <div className='hidden'/>
+      )}
 
-          {/*Gantt Initiative To Do's*/}
-          <div className='hidden absolute bottom-0 right-0 flex flex-col h-full rounded-lg border-2 border-gray-900 overflow-hidden' style={{zIndex:100,width:"18rem"}}>
-            <div className='relative flex flex-col h-full w-full items-center justify-start p-2' style={{zIndex:100}}>
-              <div className='flex flex-col h-1/2 w-full pt-8 items-center justify-start border-b-2 border-gray-800 overflow-y-scroll' style={{zIndex:100}}>
-              {false&&[0,0,0,0,0,0,].map((entry,index)=>{
-
-                return(
-                  <div key={index} className='flex flex-row my-1 h-16 shrink-0 w-full rounded-xl bg-gray-200 border-r-4 border-l-4 border-gray-800'>
+      {/*Bens Manual Uploader*/}
+      {accessGranted&&adminAccess?(
+        <div className='flex flex-col shrink-0 h-screen w-full items-center justify-start'>
+          <div className='relative flex flex-col h-4/5 w-4/5'>
+            <div className='flex flex-col h-full w-full px-2 py-4 border-b-2 border-black overflow-y-scroll'>
+            {initiatives&&Object.values(initiatives).map((initiative,initiativeIndex)=>{
+              return(
+                <div key={initiativeIndex} className={`relative flex flex-row p-2 w-full items-center justify-start rounded-sm ${initiativeIndex%2===0?"bg-gray-300":""} ${showDeleteInitiatives?"my-1":"my-0"} transition-all duration-500-ease-in-out`} onClick={()=>{if(event.target.id!=="deleteButton"){setActiveInitiative(initiative)}}}>
+                  <div className='flex flex-row w-3/5 items-center justify-start text-xs xl:text-xl font-bold text-gray-800'>
+                  {String(initiative.description)}
                   </div>
-                )
-              })}
-              </div>
 
-              <div className='absolute top-0 left-0 flex flex-col h-full w-full bg-white' style={{zIndex:99,opacity:"75%"}}>
+                  <div className='flex flex-row w-20 xl:w-36 items-center justify-start text-xs xl:text-xl font-bold text-gray-800'>
+                  {String(initiative.startDate)}
+                  </div>
+
+                  <div className='flex flex-row w-20 xl:w-36 items-center justify-start text-xs xl:text-xl font-bold text-gray-800'>
+                   {String(initiative.endDate)}
+                  </div>
+
+                  <div className='flex flex-row h-full w-16 xl:flex-1 items-center justify-end text-xs xl:text-xl font-bold text-gray-800'>
+                  {String("$"+Number.parseFloat(initiative.acceptedCost/1000).toFixed(1)+"K")}
+                  </div>
+
+                  {/*Delete Button*/}
+                  <div id={"deleteButtonParent"} className='absolute top-0 right-0 flex flex-col items-center justify-center transition-all duration-500 ease-in-out' style={{opacity:showDeleteInitiatives?"100%":"0%",transform:"translate(25%,-25%)"}}>
+                    <div id={"deleteButton"} className={`flex flex-col ${showDeleteInitiatives?"h-4 w-4":"h-0 w-0"} items-center justify-center text-sm text-gray-200 font-normal rounded-full bg-gray-500 hover:bg-gray-300 transtion-all duration-500 ease-in-out`} onClick={()=>deleteInitiative(initiatives,initiative.id)}>
+                    {showDeleteInitiatives&&String("x")}
+                    </div>
+                  </div>
+
+                </div>
+              )
+            })}
+            </div>
+
+            {/*Show Edit Initiative*/}
+            <div className={`absolute bottom-0 left-0 flex flex-col items-center justify-center w-full ${activeInitiative?"h-full":"h-0"} transition-all duration-500 ease-in-out`}>
+              {activeInitiative?(
+                <div className='relative flex flex-col h-full w-full items-center justify-center'>
+                  <div className='absolute top-0 left-0 flex flex-col h-full w-full items-center justify-center'>
+                    <div className='flex flex-col p-2 items-center justify-start rounded-xl border-4 border-c2 bg-white z-50' style={{height:"36rem", width:"23rem"}}>
+                      {/*Description*/}
+                      <div className='flex flex-col w-full pt-8 items-center justify-center text-lg font-bold' onClick={()=>setEditActiveInitiativeDescription(true)}> 
+                        {editActiveInitiativeDescription?(
+                          <input
+                            type='text'
+                            onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"DESCRIPTION",event.target.value,)}}
+                            className={`w-full px-0 py-0 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                            style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                            placeholder={"Initiative Description"}
+                            value={activeInitiative.description}
+                            onBlur={()=>setEditActiveInitiativeDescription(false)}
+                          />
+                        ):(
+                          <div className='w-full px-0 py-0 text-xl font-bold text-center'>
+                            {String(activeInitiative.description)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/*Space*/}
+                      <div className='flex flex-col w-full mt-4 items-center justify-center'>
+                        <div className='rounded-full bg-gray-900 w-1/2' style={{height:"0.15rem"}}>
+                        </div>
+                      </div>
+
+                      {/*Dates*/}
+                      <div className='flex flex-row h-48 w-full items-center justify-between'>
+                        <div className='flex flex-col w-full items-center justify-between text-lg font-bold'> 
+                          <div className='flex flex-row h-full items-center justify-start text-xl'>
+                          {String("Start Date")}
+                          </div>
+                          <div className='flex flex-col h-full mt-2 items-center justify-end'  onClick={()=>setEditActiveInitiativeStartDate(true)}>
+                            {editActiveInitiativeStartDate?(
+                              <input
+                                autoFocus
+                                type='text'
+                                onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"START_DATE",event.target.value,)}}
+                                className={`w-full px-0 py-4 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                                style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                                placeholder={"100000.00"}
+                                value={activeInitiative.startDate}
+                                onBlur={()=>setEditActiveInitiativeStartDate(false)}
+                              />
+                            ):(
+                              <div className='w-full px-4 py-4 text-xl font-bold text-center bg-gray-200 rounded-lg'>
+                                {String(activeInitiative.startDate)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className='flex flex-col w-full items-center justify-between text-lg font-bold'> 
+                          <div className='flex flex-row h-full items-center justify-start text-xl'>
+                          {String("End Date")}
+                          </div>
+                          <div className='flex flex-col h-full mt-2 items-center justify-end'  onClick={()=>setEditActiveInitiativeEndDate(true)}>
+                            {editActiveInitiativeEndDate?(
+                              <input
+                                autoFocus
+                                type='text'
+                                onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"END_DATE",event.target.value,)}}
+                                className={`w-full px-0 py-4 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                                style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                                placeholder={"100000.00"}
+                                value={activeInitiative.endDate}
+                                onBlur={()=>setEditActiveInitiativeEndDate(false)}
+                              />
+                            ):(
+                              <div className='w-full px-4 py-4 text-xl font-bold text-center bg-gray-200 rounded-lg'>
+                                {String(activeInitiative.endDate)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className='flex flex-col w-full my-4 items-center justify-center'>
+                        <div className='rounded-full bg-gray-900 w-full' style={{height:"0.05rem"}}>
+                        </div>
+                      </div>
+
+                      {/*Costs*/}
+                      <div className='flex flex-col px-4 h-72 w-full items-center justify-between'>
+                        <div className='flex flex-row w-full my-1 items-center justify-between text-lg font-bold'> 
+                          <div className='flex flex-row text-xl h-full items-center justify-start'>
+                          {String("Accepted Cost")}
+                          </div>
+                          <div className='flex flex-col h-full pt-2 items-center justify-end' onClick={()=>setEditActiveInitiativeAcceptedCost(true)}>
+                            {editActiveInitiativeAcceptedCost?(
+                              <input
+                                autoFocus
+                                type='text'
+                                onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"ACCEPTED_COST",event.target.value,)}}
+                                className={`w-full px-0 py-4 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                                style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                                placeholder={"100000.00"}
+                                value={activeInitiative.acceptedCost}
+                                onBlur={()=>setEditActiveInitiativeAcceptedCost(false)}
+                              />
+                            ):(
+                              <div className='w-full px-4 py-4 text-xl font-bold text-center rounded-lg bg-gray-200'>
+                                {String(activeInitiative.acceptedCost)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className='flex flex-col w-full mt-4 items-center justify-center'>
+                        <div className='rounded-full bg-gray-900 w-full' style={{height:"0.05rem"}}>
+                        </div>
+                        </div>
+
+                        <div className='flex flex-row w-full my-1 items-center justify-between text-lg font-bold'> 
+                          <div className='flex flex-row text-xl h-full items-center justify-start'>
+                          {String("Market Cost")}
+                          </div>
+                          <div className='flex flex-col h-full pt-2 items-center justify-end' onClick={()=>setEditActiveInitiativeMarketCost(true)}>
+                            {editActiveInitiativeMarketCost?(
+                              <input
+                                autoFocus
+                                type='text'
+                                onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"MARKET_COST",event.target.value,)}}
+                                className={`w-full px-0 py-4 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                                style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                                placeholder={"100000.00"}
+                                value={activeInitiative.marketCost}
+                                onBlur={()=>setEditActiveInitiativeMarketCost(false)}
+                              />
+                            ):(
+                              <div className='w-full px-4 py-4 text-xl font-bold text-center rounded-lg bg-gray-200'>
+                                {String(activeInitiative.marketCost)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className='flex flex-col w-full mt-4 items-center justify-center'>
+                          <div className='rounded-full bg-gray-900 w-full' style={{height:"0.05rem"}}>
+                          </div>
+                        </div>
+
+                        <div className='flex flex-row w-full my-1 items-center justify-between text-lg font-bold'> 
+                          <div className='flex flex-row text-xl h-full items-center justify-start'>
+                          {String("Realized Cost")}
+                          </div>
+                          <div className='flex flex-col h-full pt-2 items-center justify-end' onClick={()=>setEditActiveInitiativeRealizedCost(true)}>
+                            {editActiveInitiativeRealizedCost?(
+                              <input
+                                autoFocus
+                                type='text'
+                                onChange={(event)=>{updateInitiative(initiatives,activeInitiative.id,"REALIZED_COST",event.target.value,)}}
+                                className={`w-full px-0 py-4 text-xl font-bold text-center rounded-md outline-none border-none placeholder-white placeholder:italic focus:outline-none focus:ring-2 focus:ring-c2-highlight`}
+                                style={{resize:'vertical', backgroundColor:`#ffffff`,}}
+                                placeholder={"100000.00"}
+                                value={activeInitiative.realizedCost}
+                                onBlur={()=>setEditActiveInitiativeRealizedCost(false)}
+                              />
+                            ):(
+                              <div className='w-full px-4 py-4 text-xl font-bold text-center rounded-lg bg-gray-200'>
+                                {String(activeInitiative.realizedCost)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/*Shade*/}
+                  <div className='absolute top-0 left-0 flex flex-col h-full w-full bg-white opacity-90' onClick={()=>{setActiveInitiative(null)}}>
+                  </div>
+                </div>
+              ):(
+                <div className='hidden'/>
+              )}
+            </div>
+
+            {/*Buttons*/}
+            <div className='absolute bottom-0 left-0 flex flex-row h-12 w-full items-center justify-around' style={{transform:"translate(0%,calc(100% + 1rem))"}}>
+              <div className='flex flex-col h-10 w-10 items-center justify-center border-b-4 border-t-4 rounded-xl border-black' onClick={()=>setShowDeleteInitiatives((showDeleteInitiatives)=>!showDeleteInitiatives)}>
+                {String ("=")}
               </div>
             </div>
+          </div>
+        </div>
+      ):(
+        <div className='hidden'/>
+      )}
+
+      {/*Photos*/}
+      {accessGranted?(
+        <div className='flex flex-col w-full h-screen shrink-0 items-center justify-center bg-black'>
+          <div className='flex flex-row my-2 h-full w-full items-center justify-around'>
+          {[0,0].map((entry,index)=>{
+
+            return(
+              <div key={index} className='relative flex flex-col flex-1 mx-4 px-2 items-center justify-end pb-8 rounded-lg border-2 border-c2-highlight' style={{height:"100%"}}>
+                <div className='absolute top-0 left-0 h-full w-full items-center justfiy-center'>
+                  <img className="inline-block h-full w-full shrink-0 rounded-sm" src={"./photos/homePhoto.jpg"} alt="Location Icon"/>
+                </div>
+
+                <div className='absolute bottom-0 left-0 flex flex-col px-8 pb-2 h-full w-full items-center justify-end'>
+                  <div className='flex flex-col w-full items-center justify-end'>
+                    <div className='px-4 py-2 text-sm font-bold text-white bg-gray-600 rounded-xl'>
+                    {String("Before and After Coming Soon!")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          </div>
+           <div className='flex flex-row my-2 h-full w-full items-center justify-around'>
+          {[0,0].map((entry,index)=>{
+
+            return(
+              <div key={index} className='relative flex flex-col flex-1 mx-4 px-2 items-center justify-end pb-8 rounded-lg border-2 border-c2-highlight' style={{height:"100%"}}>
+                <div className='absolute top-0 left-0 h-full w-full items-center justfiy-center'>
+                  <img className="inline-block h-full w-full shrink-0 rounded-sm" src={"./photos/homePhoto.jpg"} alt="Location Icon"/>
+                </div>
+
+                <div className='absolute bottom-0 left-0 flex flex-col px-8 pb-2 h-full w-full items-center justify-end'>
+                  <div className='flex flex-col w-full items-center justify-end'>
+                    <div className='px-4 py-2 text-sm font-bold text-white bg-gray-600 rounded-xl'>
+                    {String("Before and After Coming Soon!")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
           </div>
         </div>
       ):(
@@ -771,6 +1232,216 @@ const LightIcon=(props)=>{
       </div>
     </div>
   )
+}
+
+//String value
+const LightNumber= (props) => {
+  const MONTH_NAMES={
+    "0":"January",
+    "1":"February",
+    "2":"March",
+    "3":"April",
+    "4":"May",
+    "5":"June",
+    "6":"July",
+    "7":"August",
+    "8":"September",
+    "9":"October",
+    "10":"November",
+    "11":"December",
+  };
+  const PERCENTILE_SUFFIXES={
+    '0':'th',
+    '1':'st',
+    '2':'nd',
+    '3':'rd',
+    '4':'th',
+    '5':'th',
+    '6':'th',
+    '7':'th',
+    '8':'th',
+    '9':'th',
+  }
+  const MILLISECONDS_PER_HOUR=216000
+
+  if(props.config.isTimestamp){
+    let newDate = new Date(Number.parseInt(props.value));
+    let dateString;
+    if(props.config.includeDateNum){
+      dateString=String(MONTH_NAMES[newDate.getUTCMonth()].slice(0,3)+" "+newDate.getUTCDate()+", "+newDate.getUTCFullYear());
+    }else{
+      dateString=String(MONTH_NAMES[newDate.getUTCMonth()].slice(0,3)+", "+newDate.getUTCFullYear());
+    }
+
+    let textColor;
+
+    if(props.config.signed){
+      textColor = props.value>=0?props.config.positiveColor:props.config.negativeColor;
+    }else{
+      textColor = props.config.standardColor?props.config.standardColor:'#000000';
+    }
+    return (
+      <div>
+        <div className={`${props.config.bold?('font-bold'):('font-medium')}`} style={{color:textColor}}>
+          {dateString}
+        </div>
+      </div>
+    )
+  }else if(props.config.isTimestampDelta){
+
+    //Total Time - Floor Hours = Minutes
+    //Total Minutes - Floor Minutes = Seconds
+    let delta=props.value;
+    let hours=Math.floor(delta/216000);
+    let minutes=Math.floor((delta-hours*216000)/3600);
+    let seconds=(delta-hours*216000-minutes*3600)/60;
+    let hourString=hours<10?"0"+hours:hours;
+    let timeString=String(hourString+":"+minutes+"."+seconds.toFixed(0));
+
+    //Format the string as nice hours and minutes
+    return timeString;
+  }else{
+    let value=(props.value!==null && props.value!==undefined)?props.value:"";
+
+    //Convert percentiles
+    if(props.config.suffix==='%'){
+      //value=value*100;
+    }
+
+    let suffix=props.config.suffix;
+    let decimals = props.config.decimals;
+
+    //Adjust for spacing to center
+    let prefix;
+
+    //If it is a percentage point change or a percent change, then add a plus in front of positive values
+    if((suffix==='p.p.'||suffix==='%%') && value>=0){
+      prefix = '+'
+    }else{
+      prefix=props.config.prefix===''&&!props.config.centerText?'\u00A0\u00A0\u00A0':props.config.prefix
+    }
+
+    //If its a $ gain / loss then update accordingly
+    if(prefix==='$$' && value>=0){
+      prefix='+$';
+    }else if(prefix==='$$' && value<0){
+      prefix='-$';
+    }
+
+    //If its a ++ gain / loss then update accordingly
+    if(prefix==='++' && value>=0){
+      prefix='+';
+    }else if(prefix==='++' && value<0){
+      prefix='';
+    }
+
+    //Convert the metric to units if it is not a percent
+    if(suffix!=='%' && suffix!=='%%' && suffix!=='p.p.' && suffix!=='X' && suffix!=='percentile' && value!==0){
+    let power = Math.max(Math.floor(Math.log10(Math.abs(value))),0);
+
+    //Calculate the units
+    switch(power){
+      case 0:
+        suffix=''
+        break;
+      case 1:
+        suffix='';
+        power=0;
+        break;
+      case 2:
+        suffix='';
+        power=0;
+        break;
+      case 3:
+        suffix='K'
+        break;
+      case 4:
+        suffix='K'
+        power=3;
+        break;
+      case 5:
+        suffix='K';
+        power=3;
+        break;
+      case 6:
+        suffix='M'
+        break;
+      case 7:
+        suffix='M'
+        power=6;
+        break;
+      case 8:
+        suffix='M'
+        power=6;
+        break;
+      case 9:
+        suffix='B'
+        break;
+      case 10:
+        suffix='B'
+        power=9;
+        break;
+      case 11:
+        suffix='B'
+        power=9;
+        break;
+      case 12:
+        suffix='T'
+        break;
+      case 13:
+        suffix='T'
+        power=12;
+        break;
+      case 14:
+        suffix='T'
+        power=3;
+        break;
+      default:
+        suffix=`^${power}`
+        break;
+    }
+
+    //Convert the value
+    value=props.value/Math.pow(10,power);
+    }
+
+    //Add a space to the p.p. suffix if there is one
+    if(suffix==='p.p.'){
+      suffix='\u00A0p.p.'
+    }
+
+    //Convert % change suffix back to percent
+    if(suffix==='%%'){
+      suffix='%'
+    }
+
+    //Update the suffix with a percentile if its a percentile
+    if(suffix==='percentile'){
+      //Set decimals to zero since its a percentile
+      decimals=0;
+
+      let roundedValue=value.toLocaleString('en-US',{minimumFractionDigits:0, maximumFractionDigits:0});
+      let lastDigit=roundedValue[roundedValue.length-1];
+      suffix=PERCENTILE_SUFFIXES[lastDigit];
+    }
+
+
+    //Reappend meters to suffix
+    if(props.config.suffix==='m'&&value!==0){
+      suffix=String(suffix+"m");
+    }
+
+    //Convert the value to a positive value if prefix = $$
+    if(prefix==='-$'){
+      value = Math.abs(value);
+    }
+
+    if(Math.abs(value)<0.000){
+      value=0;
+    }
+
+    return String(prefix+value.toLocaleString('en-US',{minimumFractionDigits:decimals, maximumFractionDigits:decimals})+suffix);
+  }
 }
 
 export default LightProjectTimeline;
